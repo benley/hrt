@@ -1,9 +1,11 @@
 module Main where
 
-import Data.Colour (Colour, black)
+import Data.Colour
+import Data.Colour.SRGB
 import qualified Data.Colour.Names as CN
 import Linear
 import Data.List (sortBy, sortOn)
+import Codec.Picture
 
 infinity = 1/0
 
@@ -56,17 +58,26 @@ cameraPosition = V3 0 0 0
 backgroundColor :: Colour Double
 backgroundColor = black
 
+canvasWidth :: Int
 canvasWidth = 800
-canvasHeight = 600
+canvasHeight :: Int
+canvasHeight = 800
 
 -- | Convert 2D canvas coordinates to 3D viewport coordinates
-canvasToViewport :: V2 Double -> V3 Double
+canvasToViewport :: V2 Int -> V3 Double
 canvasToViewport (V2 x y) =
-  V3 (x * viewportSize / canvasWidth) (y * viewportSize / canvasHeight) projectionPlaneZ
+  V3 (fromIntegral x * viewportSize / fromIntegral canvasWidth) (fromIntegral y * viewportSize / fromIntegral canvasHeight) projectionPlaneZ
+
+pixelRenderer :: Scene -> Int -> Int -> PixelRGB8
+pixelRenderer scene x y = do
+  let direction = canvasToViewport (V2 x y)
+  let color = toSRGB24 $ traceRay scene cameraPosition direction 1 infinity
+  let (r,g,b) = (channelRed color, channelGreen color, channelBlue color)
+  PixelRGB8 r g b
 
 main :: IO ()
 main = do
-  let scene = Scene [ Sphere (V3   0 (-1) 3) 1 CN.red
-                    , Sphere (V3   2   0  4) 1 CN.blue
-                    , Sphere (V3 (-2)  0  4) 1 CN.green ]
-  undefined
+  let scene = Scene [ Sphere (V3 1.5 1 3) 1 CN.red
+                    , Sphere (V3 1 1 4) 1 CN.blue
+                    , Sphere (V3 1 3 5) 1 CN.green ]
+  writePng "output.png" $ generateImage (pixelRenderer scene) canvasWidth canvasHeight

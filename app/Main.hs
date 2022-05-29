@@ -66,18 +66,21 @@ canvasHeight = 800
 -- | Convert 2D canvas coordinates to 3D viewport coordinates
 canvasToViewport :: V2 Int -> V3 Double
 canvasToViewport (V2 x y) =
-  V3 (fromIntegral x * viewportSize / fromIntegral canvasWidth) (fromIntegral y * viewportSize / fromIntegral canvasHeight) projectionPlaneZ
+  V3 (     fromIntegral (x - (canvasWidth  `div` 2)) * viewportSize / fromIntegral canvasWidth)
+     (-1 * fromIntegral (y - (canvasHeight `div` 2)) * viewportSize / fromIntegral canvasHeight)
+     projectionPlaneZ
 
 pixelRenderer :: Scene -> Int -> Int -> PixelRGB8
-pixelRenderer scene x y = do
+pixelRenderer scene x y =
   let direction = canvasToViewport (V2 x y)
-  let color = toSRGB24 $ traceRay scene cameraPosition direction 1 infinity
-  let (r,g,b) = (channelRed color, channelGreen color, channelBlue color)
-  PixelRGB8 r g b
+      color     = toSRGB24 $ traceRay scene cameraPosition direction 1 infinity
+      (r, g, b) = (channelRed color, channelGreen color, channelBlue color)
+  in PixelRGB8 r g b
 
 main :: IO ()
 main = do
-  let scene = Scene [ Sphere (V3 1.5 1 3) 1 CN.red
-                    , Sphere (V3 1 1 4) 1 CN.blue
-                    , Sphere (V3 1 3 5) 1 CN.green ]
+  let scene = Scene [ Sphere (V3   0 (-1) 3) 1 CN.red
+                    , Sphere (V3   2   0  4) 1 CN.blue
+                    , Sphere (V3 (-2)  0  4) 1 CN.green
+                    ]
   writePng "output.png" $ generateImage (pixelRenderer scene) canvasWidth canvasHeight

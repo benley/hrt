@@ -21,8 +21,8 @@ maintainer:         benley@gmail.com
 -- category:
 extra-source-files: CHANGELOG.md
 
-executable hrt
-    main-is:          Main.hs
+executable cgfs-02-basic-raytracing
+    main-is:          Cgfs-02-basic-raytracing.hs
 
     -- Modules included in this executable, other than Main.
     -- other-modules:

@@ -38,7 +38,7 @@ intersectRaySphere o d sphere =
 
 -- |Compute the intersection of the ray (d) from its origin (o) with every
 -- sphere and return the color of the sphere at the nearest intersection inside
--- the requested range of t.  Probably broken.
+-- the requested range of t.
 traceRay :: Scene -> V3 Double -> V3 Double -> Double -> Double -> Colour Double
 traceRay scene o d tMin tMax =
   let
@@ -84,3 +84,4 @@ main = do
                     , Sphere (V3 (-2)  0  4) 1 CN.green
                     ]
   writePng "output.png" $ generateImage (pixelRenderer scene) canvasWidth canvasHeight
+  putStrLn "wrote to output.png"

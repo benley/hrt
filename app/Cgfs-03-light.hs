@@ -1,3 +1,4 @@
+{-# LANGUAGE NamedFieldPuns #-}
 module Main where
 
 import Data.Colour
@@ -6,21 +7,59 @@ import qualified Data.Colour.Names as CN
 import Linear
 import Data.List (sortBy, sortOn)
 import Codec.Picture
+import Data.Maybe (fromJust)
+import qualified Data.Colour as CN
 
 infinity = 1/0
 
-newtype Scene = Scene
-  { spheres :: [Sphere]
-  }
+data Scene
+  = Scene
+    { spheres :: [Sphere]
+    , lights :: [Light]
+    }
 
-data Sphere = Sphere
-  { sCenter :: V3 Double
-  , sRadius :: Double
-  , sColor  :: Colour Double
-  }
+data Light
+  = Ambient
+    { intensity :: Double }
+  | Point
+    { intensity :: Double
+    , position :: V3 Double }
+  | Directional
+    { intensity :: Double
+    , direction :: V3 Double }
+
+data Sphere
+  = Sphere
+    { sCenter :: V3 Double
+    , sRadius :: Double
+    , sColor  :: Colour Double
+    }
+
+-- | Compute light intensity at a point & normal
+computeLighting
+  :: Scene
+  -> V3 Double -- ^ point
+  -> V3 Double -- ^ normal
+  -> Double
+computeLighting (Scene {lights}) p n
+  = sum $ map computeLight $ lights
+  where
+    computeLight (Ambient i) = i
+
+    computeLight (Point {intensity, position}) =
+      if dot n l <= 0 then 0 else intensity * (dot n l) / (norm n * norm l)
+      where l = position - p
+
+    computeLight (Directional {intensity, direction}) =
+      if dot n l <= 0 then 0 else intensity * (dot n l) / (norm n * norm l)
+      where l = direction
 
 -- | Compute the intersection(s) of a ray and a sphere
-intersectRaySphere :: V3 Double -> V3 Double -> Sphere -> (Double, Double)
+intersectRaySphere
+  :: V3 Double -- ^ origin
+  -> V3 Double -- ^ direction
+  -> Sphere
+  -> (Double, Double)
 intersectRaySphere o d sphere =
   let r = sRadius sphere
       co = o - sCenter sphere
@@ -39,14 +78,27 @@ intersectRaySphere o d sphere =
 -- |Compute the intersection of the ray (d) from its origin (o) with every
 -- sphere and return the color of the sphere at the nearest intersection inside
 -- the requested range of t.
-traceRay :: Scene -> V3 Double -> V3 Double -> Double -> Double -> Colour Double
+traceRay
+  :: Scene
+  -> V3 Double     -- ^ origin
+  -> V3 Double     -- ^ direction
+  -> Double        -- ^ min distance
+  -> Double        -- ^ max distance
+  -> Colour Double
 traceRay scene o d tMin tMax =
   let
+    -- I am sorry for this mess
     blarg s = [(t1, s), (t2, s)] where (t1, t2) = intersectRaySphere o d s
-    blarg2 = sortOn fst [(t, s) | (t, s) <- concatMap blarg (spheres scene), t > tMin, t < tMax]
-    closestSphere = if null blarg2 then Nothing else Just (snd $ head blarg2)
+    allIntersections = sortOn fst [(t, s) | (t, s) <- concatMap blarg (spheres scene), t >= tMin, t < tMax]
+    (closestT, closestSphere) = head allIntersections
+
+    intersection = o + (closestT *^ d)
+    normal = n ^/ norm n where n = intersection - sCenter closestSphere -- sphere normal at intersection
   in
-    maybe backgroundColor sColor closestSphere
+    if null allIntersections then backgroundColor
+    else
+      let intensity = computeLighting scene intersection normal
+      in darken intensity (sColor closestSphere)
 
 viewportSize = 1
 
@@ -56,7 +108,7 @@ cameraPosition :: V3 Double
 cameraPosition = V3 0 0 0
 
 backgroundColor :: Colour Double
-backgroundColor = black
+backgroundColor = CN.white
 
 canvasWidth :: Int
 canvasWidth = 800
@@ -79,9 +131,16 @@ pixelRenderer scene x y =
 
 main :: IO ()
 main = do
-  let scene = Scene [ Sphere (V3   0 (-1) 3) 1 CN.red
-                    , Sphere (V3   2   0  4) 1 CN.blue
-                    , Sphere (V3 (-2)  0  4) 1 CN.green
-                    ]
+  let scene =
+        Scene { spheres = [ Sphere (V3   0    (-1) 3) 1    CN.red
+                          , Sphere (V3   2      0  4) 1    CN.blue
+                          , Sphere (V3 (-2)     0  4) 1    CN.green
+                          , Sphere (V3   0 (-5001) 0) 5000 CN.yellow
+                          ]
+              , lights = [ Ambient 0.05
+                         , Point 0.6 (V3 2 1 0)
+                         , Directional 0.2 (V3 1 4 4)
+                         ]
+              }
   writePng "output.png" $ generateImage (pixelRenderer scene) canvasWidth canvasHeight
   putStrLn "wrote to output.png"

@@ -33,6 +33,7 @@ data Sphere
     { sCenter :: V3 Double
     , sRadius :: Double
     , sColor  :: Colour Double
+    , sSpecular :: Double
     }
 
 -- | Compute light intensity at a point & normal
@@ -40,19 +41,31 @@ computeLighting
   :: Scene
   -> V3 Double -- ^ point
   -> V3 Double -- ^ normal
+  -> V3 Double -- ^ camera vector
+  -> Double    -- ^ specular exponent
   -> Double
-computeLighting (Scene {lights}) p n
+computeLighting (Scene {lights}) p n cV s
   = sum $ map computeLight $ lights
   where
     computeLight (Ambient i) = i
 
     computeLight (Point {intensity, position}) =
-      if dot n l <= 0 then 0 else intensity * (dot n l) / (norm n * norm l)
+      if dot n l <= 0 then 0 else
+        intensity * (dot n l) / (norm n * norm l) + doSpecular intensity l
       where l = position - p
 
     computeLight (Directional {intensity, direction}) =
-      if dot n l <= 0 then 0 else intensity * (dot n l) / (norm n * norm l)
+      if dot n l <= 0 then 0 else
+        intensity * (dot n l) / (norm n * norm l) + doSpecular intensity l
       where l = direction
+
+    doSpecular intensity l
+      | s >= 0 =
+          let r = 2 *^ n ^* (dot n l) - l in
+            if dot r cV > 0 then
+              intensity * ((dot r cV / (norm r * norm cV)) ** s)
+            else 0
+      | otherwise = 0
 
 -- | Compute the intersection(s) of a ray and a sphere
 intersectRaySphere
@@ -97,7 +110,7 @@ traceRay scene o d tMin tMax =
   in
     if null allIntersections then backgroundColor
     else
-      let intensity = computeLighting scene intersection normal
+      let intensity = computeLighting scene intersection normal (-d) (sSpecular closestSphere)
       in darken intensity (sColor closestSphere)
 
 viewportSize = 1
@@ -132,10 +145,10 @@ pixelRenderer scene x y =
 main :: IO ()
 main = do
   let scene =
-        Scene { spheres = [ Sphere (V3   0    (-1) 3) 1    CN.red
-                          , Sphere (V3   2      0  4) 1    CN.blue
-                          , Sphere (V3 (-2)     0  4) 1    CN.green
-                          , Sphere (V3   0 (-5001) 0) 5000 CN.yellow
+        Scene { spheres = [ Sphere (V3   0    (-1) 3) 1    CN.red    500
+                          , Sphere (V3   2      0  4) 1    CN.blue   500
+                          , Sphere (V3 (-2)     0  4) 1    CN.green  10
+                          , Sphere (V3   0 (-5001) 0) 5000 CN.yellow 1000
                           ]
               , lights = [ Ambient 0.05
                          , Point 0.6 (V3 2 1 0)

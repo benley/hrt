@@ -8,7 +8,10 @@ import Linear
 import Data.List (sortOn)
 import Codec.Picture
 
+infinity :: Double
 infinity = 1/0
+
+epsilon :: Double
 epsilon = 1e-07
 
 data Scene
@@ -91,8 +94,8 @@ intersectRaySphere o d sphere =
       c = dot co co - (r * r)
 
       discriminant =
-        let d = b*b - 4*a*c in
-          if d < 0 then infinity else d
+        if dsc < 0 then infinity else dsc
+        where dsc = b*b - 4*a*c
 
       t1 = ((-1 * b) + sqrt discriminant) / (2*a)
       t2 = ((-1 * b) - sqrt discriminant) / (2*a)
@@ -144,8 +147,10 @@ traceRay scene o d tMin tMax rl =
         else
           blend r reflectedColor localColor
 
+viewportSize :: Double
 viewportSize = 1
 
+projectionPlaneZ :: Double
 projectionPlaneZ = 1
 
 cameraPosition :: V3 Double
@@ -166,7 +171,9 @@ canvasToViewport (V2 x y) =
      (-1 * fromIntegral (y - (canvasHeight `div` 2)) * viewportSize / fromIntegral canvasHeight)
      projectionPlaneZ
 
-recursionDepth = 3  -- | reflected light recursion limit
+-- | reflected light recursion limit
+recursionDepth :: Int
+recursionDepth = 3
 
 pixelRenderer :: Scene -> Int -> Int -> PixelRGB8
 pixelRenderer scene x y =
@@ -175,18 +182,41 @@ pixelRenderer scene x y =
       (r, g, b) = (channelRed color, channelGreen color, channelBlue color)
   in PixelRGB8 r g b
 
+demoScene :: Scene
+demoScene =
+  Scene
+  { spheres =
+      [ Sphere
+        { sCenter = V3 0 (-1) 3
+        , sRadius = 1
+        , sColor = CN.red
+        , sSpecular = 500
+        , sReflective = 0.2 }
+      , Sphere
+        { sCenter = V3 (-2) 0 4
+        , sRadius = 1
+        , sColor = CN.green
+        , sSpecular = 10
+        , sReflective = 0.2 }
+      , Sphere
+        { sCenter = V3 2 0 4
+        , sRadius = 1
+        , sColor = CN.blue
+        , sSpecular = 500
+        , sReflective = 0.1 }
+      , Sphere
+        { sCenter = V3 0 (-5001) 0
+        , sRadius = 5000
+        , sColor = CN.yellow
+        , sSpecular = 1000
+        , sReflective = 0.5 } ]
+  , lights =
+      [ Ambient 0.05
+      , Point 0.6 (V3 2 1 0)
+      , Directional 0.2 (V3 1 4 4) ]
+  }
+
 main :: IO ()
 main = do
-  let scene =
-        Scene { spheres = [ Sphere (V3   0    (-1) 3)    1 CN.red     500 0.2
-                          , Sphere (V3 (-2)     0  4)    1 CN.green    10 0.2
-                          , Sphere (V3   2      0  4)    1 CN.blue    500 0.1
-                          , Sphere (V3   0 (-5001) 0) 5000 CN.yellow 1000 0.5
-                          ]
-              , lights = [ Ambient 0.05
-                         , Point 0.6 (V3 2 1 0)
-                         , Directional 0.2 (V3 1 4 4)
-                         ]
-              }
-  writePng "output.png" $ generateImage (pixelRenderer scene) canvasWidth canvasHeight
+  writePng "output.png" $ generateImage (pixelRenderer demoScene) canvasWidth canvasHeight
   putStrLn "wrote to output.png"

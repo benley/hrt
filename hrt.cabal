@@ -48,3 +48,8 @@ executable cgfs-04-shadows
     import: deps
     main-is:          Cgfs-04-shadows.hs
     hs-source-dirs:   app
+
+executable cgfs-04b-reflections
+    import: deps
+    main-is:          Cgfs-04b-reflections.hs
+    hs-source-dirs:   app

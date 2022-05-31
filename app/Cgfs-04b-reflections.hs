@@ -5,36 +5,34 @@ import Data.Colour
 import Data.Colour.SRGB
 import qualified Data.Colour.Names as CN
 import Linear
-import Data.List (sortBy, sortOn)
+import Data.List (sortOn)
 import Codec.Picture
-import Data.Maybe (fromJust)
-import qualified Data.Colour as CN
 
 infinity = 1/0
+epsilon = 1e-07
 
 data Scene
   = Scene
     { spheres :: [Sphere]
-    , lights :: [Light]
-    }
+    , lights :: [Light] }
 
 data Light
   = Ambient
     { intensity :: Double }
   | Point
     { intensity :: Double
-    , position :: V3 Double }
+    , position  :: V3 Double }
   | Directional
     { intensity :: Double
     , direction :: V3 Double }
 
 data Sphere
   = Sphere
-    { sCenter :: V3 Double
-    , sRadius :: Double
-    , sColor  :: Colour Double
-    , sSpecular :: Double
-    }
+    { sCenter     :: V3 Double
+    , sRadius     :: Double
+    , sColor      :: Colour Double
+    , sSpecular   :: Double
+    , sReflective :: Double }
 
 -- | Compute light intensity at a point & normal
 computeLighting
@@ -51,27 +49,33 @@ computeLighting scene p n cV s
 
     computeLight (Point {intensity, position}) = do
       let l = position - p
-      case closestIntersection scene p l 0.001 1 of
+      case closestIntersection scene p l epsilon 1 of
         Nothing ->                           -- No shadow
           if dot n l <= 0 then 0 else
-            intensity * (dot n l) / (norm n * norm l) + doSpecular intensity l
+            intensity * dot n l / (norm n * norm l) + doSpecular intensity l
         Just _ -> 0                          -- Light ray is occluded
 
     computeLight (Directional {intensity, direction}) = do
       let l = direction
-      case closestIntersection scene p l 0.001 infinity of
+      case closestIntersection scene p l epsilon infinity of
         Nothing ->
           if dot n l <= 0 then 0 else
-            intensity * (dot n l) / (norm n * norm l) + doSpecular intensity l
+            intensity * dot n l / (norm n * norm l) + doSpecular intensity l
         Just _ -> 0
 
     doSpecular intensity l
       | s >= 0 =
-          let r = 2 *^ n ^* (dot n l) - l in
+          let r = reflectRay l n in
             if dot r cV > 0 then
               intensity * ((dot r cV / (norm r * norm cV)) ** s)
             else 0
       | otherwise = 0
+
+reflectRay
+  :: V3 Double -- ^ ray
+  -> V3 Double -- ^ normal
+  -> V3 Double -- ^ reflected ray
+reflectRay r n = 2 *^ n ^* dot n r - r
 
 -- | Compute the intersection(s) of a ray and a sphere
 intersectRaySphere
@@ -93,7 +97,6 @@ intersectRaySphere o d sphere =
       t1 = ((-1 * b) + sqrt discriminant) / (2*a)
       t2 = ((-1 * b) - sqrt discriminant) / (2*a)
   in (t1, t2)
-
 
 -- | Find the nearest intersection with any object from an origin point in some direction
 closestIntersection
@@ -120,8 +123,9 @@ traceRay
   -> V3 Double     -- ^ direction
   -> Double        -- ^ min distance
   -> Double        -- ^ max distance
+  -> Int           -- ^ recursion limit
   -> Colour Double
-traceRay scene o d tMin tMax =
+traceRay scene o d tMin tMax rl =
   case closestIntersection scene o d tMin tMax of
     Nothing -> backgroundColor
     Just (closestT, closestSphere) ->
@@ -129,7 +133,16 @@ traceRay scene o d tMin tMax =
         intersection = o + (closestT *^ d)
         normal = n ^/ norm n where n = intersection - sCenter closestSphere
         intensity = computeLighting scene intersection normal (-d) (sSpecular closestSphere)
-      in darken intensity (sColor closestSphere)
+        localColor = darken intensity (sColor closestSphere)
+
+        reflectedColor =
+          traceRay scene intersection (reflectRay (-d) normal) epsilon infinity (rl - 1)
+        r = sReflective closestSphere
+      in
+        if rl <= 0 || r <= 0 then
+          localColor
+        else
+          blend r reflectedColor localColor
 
 viewportSize = 1
 
@@ -139,7 +152,7 @@ cameraPosition :: V3 Double
 cameraPosition = V3 0 0 0
 
 backgroundColor :: Colour Double
-backgroundColor = CN.white
+backgroundColor = CN.black
 
 canvasWidth :: Int
 canvasWidth = 800
@@ -153,20 +166,22 @@ canvasToViewport (V2 x y) =
      (-1 * fromIntegral (y - (canvasHeight `div` 2)) * viewportSize / fromIntegral canvasHeight)
      projectionPlaneZ
 
+recursionDepth = 3  -- | reflected light recursion limit
+
 pixelRenderer :: Scene -> Int -> Int -> PixelRGB8
 pixelRenderer scene x y =
   let direction = canvasToViewport (V2 x y)
-      color     = toSRGB24 $ traceRay scene cameraPosition direction 1 infinity
+      color     = toSRGB24 $ traceRay scene cameraPosition direction 1 infinity recursionDepth
       (r, g, b) = (channelRed color, channelGreen color, channelBlue color)
   in PixelRGB8 r g b
 
 main :: IO ()
 main = do
   let scene =
-        Scene { spheres = [ Sphere (V3   0    (-1) 3) 1    CN.red    500
-                          , Sphere (V3   2      0  4) 1    CN.blue   500
-                          , Sphere (V3 (-2)     0  4) 1    CN.green  10
-                          , Sphere (V3   0 (-5001) 0) 5000 CN.yellow 1000
+        Scene { spheres = [ Sphere (V3   0    (-1) 3)    1 CN.red     500 0.2
+                          , Sphere (V3 (-2)     0  4)    1 CN.green    10 0.2
+                          , Sphere (V3   2      0  4)    1 CN.blue    500 0.1
+                          , Sphere (V3   0 (-5001) 0) 5000 CN.yellow 1000 0.5
                           ]
               , lights = [ Ambient 0.05
                          , Point 0.6 (V3 2 1 0)

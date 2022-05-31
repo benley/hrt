@@ -44,20 +44,26 @@ computeLighting
   -> V3 Double -- ^ camera vector
   -> Double    -- ^ specular exponent
   -> Double
-computeLighting (Scene {lights}) p n cV s
-  = sum $ map computeLight $ lights
+computeLighting scene p n cV s
+  = sum $ map computeLight $ lights scene
   where
     computeLight (Ambient i) = i
 
-    computeLight (Point {intensity, position}) =
-      if dot n l <= 0 then 0 else
-        intensity * (dot n l) / (norm n * norm l) + doSpecular intensity l
-      where l = position - p
+    computeLight (Point {intensity, position}) = do
+      let l = position - p
+      case closestIntersection scene p l 0.001 1 of
+        Nothing ->                           -- No shadow
+          if dot n l <= 0 then 0 else
+            intensity * (dot n l) / (norm n * norm l) + doSpecular intensity l
+        Just _ -> 0                          -- Light ray is occluded
 
-    computeLight (Directional {intensity, direction}) =
-      if dot n l <= 0 then 0 else
-        intensity * (dot n l) / (norm n * norm l) + doSpecular intensity l
-      where l = direction
+    computeLight (Directional {intensity, direction}) = do
+      let l = direction
+      case closestIntersection scene p l 0.001 infinity of
+        Nothing ->
+          if dot n l <= 0 then 0 else
+            intensity * (dot n l) / (norm n * norm l) + doSpecular intensity l
+        Just _ -> 0
 
     doSpecular intensity l
       | s >= 0 =

@@ -88,9 +88,26 @@ intersectRaySphere o d sphere =
       t2 = ((-1 * b) - sqrt discriminant) / (2*a)
   in (t1, t2)
 
--- |Compute the intersection of the ray (d) from its origin (o) with every
--- sphere and return the color of the sphere at the nearest intersection inside
--- the requested range of t.
+
+-- | Find the nearest intersection with any object from an origin point in some direction
+closestIntersection
+  :: Scene
+  -> V3 Double -- ^ origin
+  -> V3 Double -- ^ direction
+  -> Double    -- ^ min distance
+  -> Double    -- ^ max distance
+  -> Maybe (Double, Sphere)
+closestIntersection scene o d tMin tMax =
+  let
+    -- I am sorry for this mess
+    blarg s = [(t1, s), (t2, s)] where (t1, t2) = intersectRaySphere o d s
+    allIntersections = sortOn fst [(t, s) | (t, s) <- concatMap blarg (spheres scene), t >= tMin, t < tMax]
+    (closestT, closestSphere) = head allIntersections
+  in
+    if null allIntersections then Nothing else Just (closestT, closestSphere)
+
+-- | Trace a ray from the origin in some direction, find the first object it
+-- hits (if any), and return the object's color after acccounting for lighting.
 traceRay
   :: Scene
   -> V3 Double     -- ^ origin
@@ -99,18 +116,13 @@ traceRay
   -> Double        -- ^ max distance
   -> Colour Double
 traceRay scene o d tMin tMax =
-  let
-    -- I am sorry for this mess
-    blarg s = [(t1, s), (t2, s)] where (t1, t2) = intersectRaySphere o d s
-    allIntersections = sortOn fst [(t, s) | (t, s) <- concatMap blarg (spheres scene), t >= tMin, t < tMax]
-    (closestT, closestSphere) = head allIntersections
-
-    intersection = o + (closestT *^ d)
-    normal = n ^/ norm n where n = intersection - sCenter closestSphere -- sphere normal at intersection
-  in
-    if null allIntersections then backgroundColor
-    else
-      let intensity = computeLighting scene intersection normal (-d) (sSpecular closestSphere)
+  case closestIntersection scene o d tMin tMax of
+    Nothing -> backgroundColor
+    Just (closestT, closestSphere) ->
+      let
+        intersection = o + (closestT *^ d)
+        normal = n ^/ norm n where n = intersection - sCenter closestSphere
+        intensity = computeLighting scene intersection normal (-d) (sSpecular closestSphere)
       in darken intensity (sColor closestSphere)
 
 viewportSize = 1

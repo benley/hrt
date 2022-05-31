@@ -39,8 +39,12 @@ executable cgfs-03-light-diffuse-reflection
     main-is:          Cgfs-03-light-diffuse-reflection.hs
     hs-source-dirs:   app
 
-
 executable cgfs-03-light-specular-reflection
     import: deps
     main-is:          Cgfs-03-light-specular-reflection.hs
+    hs-source-dirs:   app
+
+executable cgfs-04-shadows
+    import: deps
+    main-is:          Cgfs-04-shadows.hs
     hs-source-dirs:   app

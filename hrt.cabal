@@ -53,3 +53,8 @@ executable cgfs-04b-reflections
     import: deps
     main-is:          Cgfs-04b-reflections.hs
     hs-source-dirs:   app
+
+executable cgfs-05
+    import: deps
+    main-is:          Cgfs-05.hs
+    hs-source-dirs:   app

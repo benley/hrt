@@ -5,6 +5,7 @@ import Data.Colour
 import Data.Colour.SRGB
 import qualified Data.Colour.Names as CN
 import Linear
+import Linear.Affine
 import Data.List (sortOn)
 import Codec.Picture
 
@@ -20,18 +21,18 @@ data Scene
     , lights :: [Light] }
 
 data Light
-  = Ambient
+  = AmbientLight
     { intensity :: Double }
-  | Point
+  | PointLight
     { intensity :: Double
-    , position  :: V3 Double }
-  | Directional
+    , position  :: Point V3 Double }
+  | DirectionalLight
     { intensity :: Double
     , direction :: V3 Double }
 
 data Sphere
   = Sphere
-    { sCenter     :: V3 Double
+    { sCenter     :: Point V3 Double
     , sRadius     :: Double
     , sColor      :: Colour Double
     , sSpecular   :: Double
@@ -40,27 +41,27 @@ data Sphere
 -- | Compute light intensity at a point & normal
 computeLighting
   :: Scene
-  -> V3 Double -- ^ point
-  -> V3 Double -- ^ normal
-  -> V3 Double -- ^ camera vector
-  -> Double    -- ^ specular exponent
+  -> Point V3 Double -- ^ point
+  -> V3 Double       -- ^ normal
+  -> V3 Double       -- ^ camera vector
+  -> Double          -- ^ specular exponent
   -> Double
-computeLighting scene p n cV s
+computeLighting scene (P p) n cV s
   = sum $ map computeLight $ lights scene
   where
-    computeLight (Ambient i) = i
+    computeLight (AmbientLight i) = i
 
-    computeLight (Point {intensity, position}) = do
+    computeLight (PointLight {intensity, position = P position}) = do
       let l = position - p
-      case closestIntersection scene p l epsilon 1 of
+      case closestIntersection scene (P p) l epsilon 1 of
         Nothing ->                           -- No shadow
           if dot n l <= 0 then 0 else
             intensity * dot n l / (norm n * norm l) + doSpecular intensity l
         Just _ -> 0                          -- Light ray is occluded
 
-    computeLight (Directional {intensity, direction}) = do
+    computeLight (DirectionalLight {intensity, direction}) = do
       let l = direction
-      case closestIntersection scene p l epsilon infinity of
+      case closestIntersection scene (P p) l epsilon infinity of
         Nothing ->
           if dot n l <= 0 then 0 else
             intensity * dot n l / (norm n * norm l) + doSpecular intensity l
@@ -82,13 +83,12 @@ reflectRay r n = 2 *^ n ^* dot n r - r
 
 -- | Compute the intersection(s) of a ray and a sphere
 intersectRaySphere
-  :: V3 Double -- ^ origin
-  -> V3 Double -- ^ direction
+  :: Point V3 Double -- ^ origin
+  -> V3 Double       -- ^ direction
   -> Sphere
   -> (Double, Double)
-intersectRaySphere o d sphere =
-  let r = sRadius sphere
-      co = o - sCenter sphere
+intersectRaySphere (P o) d (Sphere {sRadius=r, sCenter=P center}) =
+  let co = o - center
       a = dot d d
       b = 2 * dot co d
       c = dot co co - (r * r)
@@ -104,10 +104,10 @@ intersectRaySphere o d sphere =
 -- | Find the nearest intersection with any object from an origin point in some direction
 closestIntersection
   :: Scene
-  -> V3 Double -- ^ origin
-  -> V3 Double -- ^ direction
-  -> Double    -- ^ min distance
-  -> Double    -- ^ max distance
+  -> Point V3 Double        -- ^ origin
+  -> V3 Double              -- ^ direction
+  -> Double                 -- ^ min distance
+  -> Double                 -- ^ max distance
   -> Maybe (Double, Sphere)
 closestIntersection scene o d tMin tMax =
   let
@@ -122,19 +122,19 @@ closestIntersection scene o d tMin tMax =
 -- hits (if any), and return the object's color after acccounting for lighting.
 traceRay
   :: Scene
-  -> V3 Double     -- ^ origin
-  -> V3 Double     -- ^ direction
-  -> Double        -- ^ min distance
-  -> Double        -- ^ max distance
-  -> Int           -- ^ recursion limit
+  -> Point V3 Double  -- ^ origin
+  -> V3 Double        -- ^ direction
+  -> Double           -- ^ min distance
+  -> Double           -- ^ max distance
+  -> Int              -- ^ recursion limit
   -> Colour Double
-traceRay scene o d tMin tMax rl =
-  case closestIntersection scene o d tMin tMax of
+traceRay scene (P o) d tMin tMax rl =
+  case closestIntersection scene (P o) d tMin tMax of
     Nothing -> backgroundColor
     Just (closestT, closestSphere) ->
       let
-        intersection = o + (closestT *^ d)
-        normal = n ^/ norm n where n = intersection - sCenter closestSphere
+        intersection = P $ o + (closestT *^ d)
+        normal = n ^/ norm n where P n = intersection - sCenter closestSphere
         intensity = computeLighting scene intersection normal (-d) (sSpecular closestSphere)
         localColor = darken intensity (sColor closestSphere)
 
@@ -153,8 +153,8 @@ viewportSize = 1
 projectionPlaneZ :: Double
 projectionPlaneZ = 1
 
-cameraPosition :: V3 Double
-cameraPosition = V3 0 0 0
+cameraPosition :: Point V3 Double
+cameraPosition = P $ V3 0 0 0
 
 backgroundColor :: Colour Double
 backgroundColor = CN.black
@@ -187,33 +187,33 @@ demoScene =
   Scene
   { spheres =
       [ Sphere
-        { sCenter = V3 0 (-1) 3
+        { sCenter = P $ V3 0 (-1) 3
         , sRadius = 1
         , sColor = CN.red
         , sSpecular = 500
         , sReflective = 0.2 }
       , Sphere
-        { sCenter = V3 (-2) 0 4
+        { sCenter = P $ V3 (-2) 0 4
         , sRadius = 1
         , sColor = CN.green
         , sSpecular = 10
         , sReflective = 0.2 }
       , Sphere
-        { sCenter = V3 2 0 4
+        { sCenter = P $ V3 2 0 4
         , sRadius = 1
         , sColor = CN.blue
         , sSpecular = 500
         , sReflective = 0.1 }
       , Sphere
-        { sCenter = V3 0 (-5001) 0
+        { sCenter = P $ V3 0 (-5001) 0
         , sRadius = 5000
         , sColor = CN.yellow
         , sSpecular = 1000
         , sReflective = 0.5 } ]
   , lights =
-      [ Ambient 0.05
-      , Point 0.6 (V3 2 1 0)
-      , Directional 0.2 (V3 1 4 4) ]
+      [ AmbientLight 0.05
+      , PointLight 0.6 (P $ V3 2 1 0)
+      , DirectionalLight 0.2 (V3 1 4 4) ]
   }
 
 main :: IO ()

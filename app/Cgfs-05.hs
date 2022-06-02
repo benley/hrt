@@ -1,6 +1,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 module Main where
 
+import Control.Lens
 import Data.Colour
 import Data.Colour.SRGB
 import qualified Data.Colour.Names as CN
@@ -153,9 +154,6 @@ viewportSize = 1
 projectionPlaneZ :: Double
 projectionPlaneZ = 1
 
-cameraPosition :: Point V3 Double
-cameraPosition = P $ V3 0 0 0
-
 backgroundColor :: Colour Double
 backgroundColor = CN.black
 
@@ -175,10 +173,22 @@ canvasToViewport (V2 x y) =
 recursionDepth :: Int
 recursionDepth = 3
 
+cameraPosition :: Point V3 Double
+cameraPosition = P $ V3 3 0 1
+
+cameraLookAt :: V3 Double
+cameraLookAt = V3 1 0 (-1)
+
+cameraUp :: V3 Double
+cameraUp = V3 0 1 0
+
+cameraRotation :: M33 Double
+cameraRotation = lookAt (unP cameraPosition) cameraLookAt cameraUp ^. _m33
+
 pixelRenderer :: Scene -> Int -> Int -> PixelRGB8
 pixelRenderer scene x y =
-  let direction = canvasToViewport (V2 x y)
-      color     = toSRGB24 $ traceRay scene cameraPosition direction 1 infinity recursionDepth
+  let direction = cameraRotation !* canvasToViewport (V2 x y)
+      color     = toSRGB24 $ traceRay scene cameraPosition direction epsilon infinity recursionDepth
       (r, g, b) = (channelRed color, channelGreen color, channelBlue color)
   in PixelRGB8 r g b
 

@@ -28,6 +28,7 @@ common deps
       , linear ^>=1.21.8
       , colour ^>=2.3.6
       , JuicyPixels ^>=3.3.7
+      , lens ^>=5.0.1
 
 executable cgfs-02-basic-raytracing
     import: deps

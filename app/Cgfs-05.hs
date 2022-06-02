@@ -19,7 +19,8 @@ epsilon = 1e-07
 data Scene
   = Scene
     { spheres :: [Sphere]
-    , lights :: [Light] }
+    , lights  :: [Light]
+    , camera  :: Camera }
 
 data Light
   = AmbientLight
@@ -38,6 +39,12 @@ data Sphere
     , sColor      :: Colour Double
     , sSpecular   :: Double
     , sReflective :: Double }
+
+data Camera
+  = Camera
+  { cameraPosition  :: Point V3 Double
+  , cameraDirection :: V3 Double
+  , cameraUp        :: V3 Double }
 
 -- | Compute light intensity at a point & normal
 computeLighting
@@ -173,23 +180,14 @@ canvasToViewport (V2 x y) =
 recursionDepth :: Int
 recursionDepth = 3
 
-cameraPosition :: Point V3 Double
-cameraPosition = P $ V3 3 0 1
-
-cameraLookAt :: V3 Double
-cameraLookAt = V3 1 0 (-1)
-
-cameraUp :: V3 Double
-cameraUp = V3 0 1 0
-
-cameraRotation :: M33 Double
-cameraRotation = lookAt (unP cameraPosition) cameraLookAt cameraUp ^. _m33
-
 pixelRenderer :: Scene -> Int -> Int -> PixelRGB8
-pixelRenderer scene x y =
-  let direction = cameraRotation !* canvasToViewport (V2 x y)
-      color     = toSRGB24 $ traceRay scene cameraPosition direction epsilon infinity recursionDepth
-      (r, g, b) = (channelRed color, channelGreen color, channelBlue color)
+pixelRenderer scene@Scene{camera} x y =
+  let
+    cameraRotation :: M33 Double
+    cameraRotation = lookAt (unP $ cameraPosition camera) (cameraDirection camera) (cameraUp camera) ^. _m33
+    direction = cameraRotation !* canvasToViewport (V2 x y)
+    color     = toSRGB24 $ traceRay scene (cameraPosition camera) direction epsilon infinity recursionDepth
+    (r, g, b) = (channelRed color, channelGreen color, channelBlue color)
   in PixelRGB8 r g b
 
 demoScene :: Scene
@@ -224,7 +222,11 @@ demoScene =
       [ AmbientLight 0.05
       , PointLight 0.6 (P $ V3 2 1 0)
       , DirectionalLight 0.2 (V3 1 4 4) ]
-  }
+  , camera =
+      Camera
+      { cameraPosition = P $ V3 3 0 1
+      , cameraDirection = V3 1 0 (-1)
+      , cameraUp = V3 0 1 0 } }
 
 main :: IO ()
 main = do

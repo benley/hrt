@@ -158,6 +158,7 @@ traceRay scene (P o) d tMin tMax rl =
 viewportSize :: Double
 viewportSize = 1
 
+-- | Distance between the camera and the projection plane
 projectionPlaneZ :: Double
 projectionPlaneZ = 1
 
@@ -224,8 +225,8 @@ demoScene =
       , DirectionalLight 0.2 (V3 1 4 4) ]
   , camera =
       Camera
-      { cameraPosition = P $ V3 3 0 1
-      , cameraDirection = V3 1 0 (-1)
+      { cameraPosition = P $ V3 0 2 (-2)
+      , cameraDirection = V3 0 0 (-6)
       , cameraUp = V3 0 1 0 } }
 
 main :: IO ()

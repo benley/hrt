@@ -21,6 +21,7 @@ data Scene
     { shapes :: [Shape]
     , lights  :: [Light]
     , camera  :: Camera }
+    deriving Show
 
 data Light
   = AmbientLight
@@ -31,6 +32,7 @@ data Light
   | DirectionalLight
     { intensity :: Double
     , direction :: V3 Double }
+  deriving Show
 
 data Shape
   = Sphere
@@ -43,17 +45,20 @@ data Shape
     { planePoint  :: Point V3 Double
     , planeNormal :: V3 Double
     }
+  deriving Show
 
 data Camera
   = Camera
     { cameraPosition  :: Point V3 Double
     , cameraDirection :: V3 Double
-    , cameraUp        :: V3 Double }
+    , cameraUp        :: V3 Double
+    } deriving Show
 
 data Ray
   = Ray
     { rayOrigin :: Point V3 Double
-    , rayDirection :: V3 Double }
+    , rayDirection :: V3 Double
+    } deriving Show
 
 -- | Compute light intensity at a point & normal
 computeLighting
@@ -63,14 +68,14 @@ computeLighting
   -> V3 Double       -- ^ camera vector
   -> Double          -- ^ specular exponent
   -> Double
-computeLighting scene (P p) n cV s
+computeLighting scene p n cV s
   = sum $ map computeLight $ lights scene
   where
     computeLight (AmbientLight i) = i
 
-    computeLight (PointLight {intensity, position = P position}) = do
-      let l = position - p
-      case closestIntersection scene (P p) l epsilon 1 of
+    computeLight (PointLight {intensity, position}) = do
+      let l = unP $ position - p
+      case closestIntersection scene (Ray p l) epsilon 1 of
         -- No shadow
         Nothing ->
           if dot n l <= 0 then 0 else
@@ -80,7 +85,7 @@ computeLighting scene (P p) n cV s
 
     computeLight (DirectionalLight {intensity, direction}) = do
       let l = direction
-      case closestIntersection scene (P p) l epsilon infinity of
+      case closestIntersection scene (Ray p l) epsilon infinity of
         Nothing ->
           if dot n l <= 0 then 0 else
             intensity * dot n l / (norm n * norm l) + doSpecular intensity l
@@ -102,12 +107,11 @@ reflectRay r n = 2 *^ n ^* dot n r - r
 
 -- | Compute the intersection(s) of a ray and a shape
 intersectRayShape
-  :: Point V3 Double -- ^ origin
-  -> V3 Double       -- ^ direction
+  :: Ray
   -> Shape
   -> (Double, Double)
-intersectRayShape (P o) d (Sphere {sRadius=r, sCenter=P center}) =
-  let co = o - center
+intersectRayShape (Ray o d) (Sphere {sRadius=r, sCenter}) =
+  let co = unP $ o - sCenter
       a = dot d d
       b = 2 * dot co d
       c = dot co co - (r * r)
@@ -120,18 +124,17 @@ intersectRayShape (P o) d (Sphere {sRadius=r, sCenter=P center}) =
       t2 = ((-1 * b) - sqrt discriminant) / (2*a)
   in (t1, t2)
 
--- | Find the nearest intersection with any object from an origin point in some direction
+-- | Find the nearest intersection between a ray and any object
 closestIntersection
   :: Scene
-  -> Point V3 Double        -- ^ origin
-  -> V3 Double              -- ^ direction
+  -> Ray
   -> Double                 -- ^ min distance
   -> Double                 -- ^ max distance
   -> Maybe (Double, Shape)
-closestIntersection scene o d tMin tMax =
+closestIntersection scene ray tMin tMax =
   let
     -- I am sorry for this mess
-    blarg s = [(t1, s), (t2, s)] where (t1, t2) = intersectRayShape o d s
+    blarg s = [(t1, s), (t2, s)] where (t1, t2) = intersectRayShape ray s
     allIntersections = sortOn fst [(t, s) | (t, s) <- concatMap blarg (shapes scene), t >= tMin, t < tMax]
     (closestT, closestSphere) = head allIntersections
   in
@@ -146,8 +149,8 @@ traceRay
   -> Double           -- ^ max distance
   -> Int              -- ^ recursion limit
   -> Colour Double
-traceRay scene (Ray (P o) d) tMin tMax rl =
-  case closestIntersection scene (P o) d tMin tMax of
+traceRay scene ray@(Ray (P o) d) tMin tMax rl =
+  case closestIntersection scene ray tMin tMax of
     Nothing -> backgroundColor
     Just (closestT, closestSphere) ->
       let

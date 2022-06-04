@@ -1,14 +1,15 @@
 {-# LANGUAGE NamedFieldPuns #-}
 module Main where
 
+import Codec.Picture
 import Control.Lens
 import Data.Colour
 import Data.Colour.SRGB
-import qualified Data.Colour.Names as CN
+import Data.List (sortOn)
+import Data.Maybe (mapMaybe)
 import Linear
 import Linear.Affine
-import Data.List (sortOn)
-import Codec.Picture
+import qualified Data.Colour.Names as CN
 
 infinity :: Double
 infinity = 1/0
@@ -18,7 +19,7 @@ epsilon = 1e-07
 
 data Scene
   = Scene
-    { shapes :: [Shape]
+    { shapes  :: [Shape]
     , lights  :: [Light]
     , camera  :: Camera }
     deriving Show
@@ -44,7 +45,9 @@ data Shape
   | Plane
     { planePoint  :: Point V3 Double
     , planeNormal :: V3 Double
-    }
+    , sColor      :: Colour Double
+    , sSpecular   :: Double
+    , sReflective :: Double }
   deriving Show
 
 data Camera
@@ -59,6 +62,12 @@ data Ray
     { rayOrigin :: Point V3 Double
     , rayDirection :: V3 Double
     } deriving Show
+
+data Intersection
+  = Intersection
+    { intersectionPoint  :: Point V3 Double
+    , intersectionNormal :: V3 Double
+    , intersectionTMin   :: Double }
 
 -- | Compute light intensity at a point & normal
 computeLighting
@@ -109,7 +118,7 @@ reflectRay r n = 2 *^ n ^* dot n r - r
 intersectRayShape
   :: Ray
   -> Shape
-  -> (Double, Double)
+  -> Maybe Intersection
 intersectRayShape (Ray o d) (Sphere {sRadius=r, sCenter}) =
   let co = unP $ o - sCenter
       a = dot d d
@@ -122,7 +131,27 @@ intersectRayShape (Ray o d) (Sphere {sRadius=r, sCenter}) =
 
       t1 = ((-1 * b) + sqrt discriminant) / (2*a)
       t2 = ((-1 * b) - sqrt discriminant) / (2*a)
-  in (t1, t2)
+  in
+    if discriminant == infinity
+    then Nothing
+    else do
+      let tMin = min t1 t2
+          intersection = P (unP o + (tMin *^ d))
+          normal = n ^/ norm n where P n = intersection - sCenter
+      Just Intersection { intersectionPoint = intersection
+                        , intersectionNormal = normal
+                        , intersectionTMin = tMin }
+
+intersectRayShape (Ray{rayOrigin, rayDirection}) (Plane{planePoint, planeNormal}) =
+  let denominator = dot rayDirection planeNormal
+  in if abs denominator <= epsilon
+     then Nothing
+     else let t = unP (planePoint - rayOrigin) `dot` (planeNormal ^/ denominator)
+          in if t <= epsilon
+             then Nothing
+             else Just Intersection { intersectionPoint = rayOrigin .+^ (rayDirection ^* t)
+                                    , intersectionNormal = planeNormal
+                                    , intersectionTMin = t }
 
 -- | Find the nearest intersection between a ray and any object
 closestIntersection
@@ -130,15 +159,19 @@ closestIntersection
   -> Ray
   -> Double                 -- ^ min distance
   -> Double                 -- ^ max distance
-  -> Maybe (Double, Shape)
+  -> Maybe (Intersection, Shape)
 closestIntersection scene ray tMin tMax =
   let
-    -- I am sorry for this mess
-    blarg s = [(t1, s), (t2, s)] where (t1, t2) = intersectRayShape ray s
-    allIntersections = sortOn fst [(t, s) | (t, s) <- concatMap blarg (shapes scene), t >= tMin, t < tMax]
-    (closestT, closestSphere) = head allIntersections
-  in
-    if null allIntersections then Nothing else Just (closestT, closestSphere)
+    -- this is still clumsy
+    blarg :: Shape -> Maybe (Intersection, Shape)
+    blarg shape = case intersectRayShape ray shape of
+                    Just i@Intersection{intersectionTMin=t} | t < tMax && t >= tMin -> Just (i, shape)
+                    _                                                               -> Nothing
+    allIntersections :: [(Intersection, Shape)]
+    allIntersections = sortOn (\(Intersection{intersectionTMin=t}, _) -> t) (mapMaybe blarg (shapes scene))
+  in case allIntersections of
+    a:_ -> Just a
+    _   -> Nothing
 
 -- | Trace a ray from the origin in some direction, find the first object it
 -- hits (if any), and return the object's color after acccounting for lighting.
@@ -149,19 +182,22 @@ traceRay
   -> Double           -- ^ max distance
   -> Int              -- ^ recursion limit
   -> Colour Double
-traceRay scene ray@(Ray (P o) d) tMin tMax rl =
+traceRay scene ray@(Ray _ d) tMin tMax rl =
   case closestIntersection scene ray tMin tMax of
     Nothing -> backgroundColor
-    Just (closestT, closestSphere) ->
+    Just (closestI, closestShape) ->
       let
-        intersection = P $ o + (closestT *^ d)
-        normal = n ^/ norm n where P n = intersection - sCenter closestSphere
-        intensity = computeLighting scene intersection normal (-d) (sSpecular closestSphere)
-        localColor = darken intensity (sColor closestSphere)
+        intersection = intersectionPoint closestI
+        -- intersection = P $ o + (intersectionTMin closestI *^ d)
+        -- TODO this next line probably needs to go into the sphere intersection function
+        -- normal = n ^/ norm n where P n = intersection - sCenter closestSphere
+        normal = intersectionNormal closestI
+        intensity = computeLighting scene intersection normal (-d) (sSpecular closestShape)
+        localColor = darken intensity (sColor closestShape)
 
         reflectedColor =
           traceRay scene (Ray intersection (reflectRay (-d) normal)) epsilon infinity (rl - 1)
-        r = sReflective closestSphere
+        r = sReflective closestShape
       in
         if rl <= 0 || r <= 0 then
           localColor
@@ -225,9 +261,9 @@ demoScene =
         , sColor = CN.blue
         , sSpecular = 500
         , sReflective = 0.1 }
-      , Sphere
-        { sCenter = P $ V3 0 (-5001) 0
-        , sRadius = 5000
+      , Plane
+        { planePoint = P $ V3 0 (-1) 0
+        , planeNormal = V3 0 1 0
         , sColor = CN.yellow
         , sSpecular = 1000
         , sReflective = 0.5 } ]

@@ -135,6 +135,8 @@ intersectRayShape (Ray o d) (Sphere {sRadius=r, sCenter}) =
     if discriminant == infinity
     then Nothing
     else do
+      -- TODO: if tMin < epsilon then we should return the other intersection
+      --       point (unless it too is < epsilon)
       let tMin = min t1 t2
           intersection = P (unP o + (tMin *^ d))
           normal = n ^/ norm n where P n = intersection - sCenter

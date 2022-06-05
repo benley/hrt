@@ -19,7 +19,7 @@ epsilon = 1e-07
 
 data Scene
   = Scene
-    { shapes  :: [Shape]
+    { objects  :: [Object]
     , lights  :: [Light]
     , camera  :: Camera }
     deriving Show
@@ -38,17 +38,22 @@ data Light
 data Shape
   = Sphere
     { sCenter     :: Point V3 Double
-    , sRadius     :: Double
-    , sColor      :: Colour Double
-    , sSpecular   :: Double
-    , sReflective :: Double }
+    , sRadius     :: Double }
   | Plane
     { planePoint  :: Point V3 Double
-    , planeNormal :: V3 Double
-    , sColor      :: Colour Double
-    , sSpecular   :: Double
-    , sReflective :: Double }
+    , planeNormal :: V3 Double }
   deriving Show
+
+data Material
+  = ColorMaterial
+    { color :: Colour Double }
+  | Material
+    { color :: Colour Double
+    , reflective :: Double
+    , specular :: Double }
+  deriving Show
+
+data Object = Object { shape :: Shape, material :: Material } deriving Show
 
 data Camera
   = Camera
@@ -161,16 +166,16 @@ closestIntersection
   -> Ray
   -> Double                 -- ^ min distance
   -> Double                 -- ^ max distance
-  -> Maybe (Intersection, Shape)
+  -> Maybe (Intersection, Object)
 closestIntersection scene ray tMin tMax =
   let
     -- this is still clumsy
-    blarg :: Shape -> Maybe (Intersection, Shape)
-    blarg shape = case intersectRayShape ray shape of
-                    Just i@Intersection{intersectionTMin=t} | t < tMax && t >= tMin -> Just (i, shape)
+    blarg :: Object -> Maybe (Intersection, Object)
+    blarg obj = case intersectRayShape ray (shape obj) of
+                    Just i@Intersection{intersectionTMin=t} | t < tMax && t >= tMin -> Just (i, obj)
                     _                                                               -> Nothing
-    allIntersections :: [(Intersection, Shape)]
-    allIntersections = sortOn (\(Intersection{intersectionTMin=t}, _) -> t) (mapMaybe blarg (shapes scene))
+    allIntersections :: [(Intersection, Object)]
+    allIntersections = sortOn (\(Intersection{intersectionTMin=t}, _) -> t) (mapMaybe blarg (objects scene))
   in case allIntersections of
     a:_ -> Just a
     _   -> Nothing
@@ -194,12 +199,12 @@ traceRay scene ray@(Ray _ d) tMin tMax rl =
         -- TODO this next line probably needs to go into the sphere intersection function
         -- normal = n ^/ norm n where P n = intersection - sCenter closestSphere
         normal = intersectionNormal closestI
-        intensity = computeLighting scene intersection normal (-d) (sSpecular closestShape)
-        localColor = darken intensity (sColor closestShape)
+        intensity = computeLighting scene intersection normal (-d) (specular (material closestShape))
+        localColor = darken intensity (color (material closestShape))
 
         reflectedColor =
           traceRay scene (Ray intersection (reflectRay (-d) normal)) epsilon infinity (rl - 1)
-        r = sReflective closestShape
+        r = reflective (material closestShape)
       in
         if rl <= 0 || r <= 0 then
           localColor
@@ -244,31 +249,40 @@ pixelRenderer scene@Scene{camera} x y =
 demoScene :: Scene
 demoScene =
   Scene
-  { shapes =
-      [ Sphere
-        { sCenter = P $ V3 0 (-1) 3
-        , sRadius = 1
-        , sColor = CN.red
-        , sSpecular = 500
-        , sReflective = 0.2 }
-      , Sphere
-        { sCenter = P $ V3 (-2) 0 4
-        , sRadius = 1
-        , sColor = CN.green
-        , sSpecular = 10
-        , sReflective = 0.2 }
-      , Sphere
-        { sCenter = P $ V3 2 0 4
-        , sRadius = 1
-        , sColor = CN.blue
-        , sSpecular = 500
-        , sReflective = 0.1 }
-      , Plane
-        { planePoint = P $ V3 0 (-1) 0
-        , planeNormal = V3 0 1 0
-        , sColor = CN.yellow
-        , sSpecular = 1000
-        , sReflective = 0.5 } ]
+  { objects =
+      [ Object
+        { shape = Sphere
+                  { sCenter = P $ V3 0 (-1) 3
+                  , sRadius = 1 }
+        , material = Material
+                     { color = CN.red
+                     , specular = 500
+                     , reflective = 0.2 } }
+      , Object
+        { shape = Sphere
+                  { sCenter = P $ V3 (-2) 0 4
+                  , sRadius = 1 }
+        , material = Material
+                     { color = CN.green
+                     , specular = 10
+                     , reflective = 0.2 } }
+      , Object
+        { shape = Sphere
+                  { sCenter = P $ V3 2 0 4
+                  , sRadius = 1 }
+        , material = Material
+                     { color = CN.blue
+                     , specular = 500
+                     , reflective = 0.1 } }
+      , Object
+        { shape = Plane
+                  { planePoint = P $ V3 0 (-1) 0
+                  , planeNormal = V3 0 1 0 }
+        , material = Material
+                     { color = CN.yellow
+                     , specular = 1000
+                     , reflective = 0.5 } }
+      ]
   , lights =
       [ AmbientLight 0.05
       , PointLight 0.6 (P $ V3 2 1 0)

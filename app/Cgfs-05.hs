@@ -42,6 +42,7 @@ data Shape
   | Plane
     { planePoint  :: Point V3 Double
     , planeNormal :: V3 Double }
+  | Triangle (Point V3 Double) (Point V3 Double) (Point V3 Double)
   deriving Show
 
 data Material
@@ -149,16 +150,26 @@ intersectRayShape (Ray o d) (Sphere {sRadius=r, sCenter}) =
                         , intersectionNormal = normal
                         , intersectionTMin = tMin }
 
-intersectRayShape (Ray{rayOrigin, rayDirection}) (Plane{planePoint, planeNormal}) =
+intersectRayShape (Ray{rayOrigin, rayDirection}) (Plane{planePoint, planeNormal}) = do
   let denominator = dot rayDirection planeNormal
-  in if abs denominator <= epsilon
-     then Nothing
-     else let t = unP (planePoint - rayOrigin) `dot` (planeNormal ^/ denominator)
-          in if t <= epsilon
-             then Nothing
-             else Just Intersection { intersectionPoint = rayOrigin .+^ (rayDirection ^* t)
-                                    , intersectionNormal = planeNormal
-                                    , intersectionTMin = t }
+      t = unP (planePoint - rayOrigin) `dot` (planeNormal ^/ denominator)
+  if abs denominator <= epsilon || t <= epsilon
+    then Nothing
+    else Just Intersection { intersectionPoint = rayOrigin .+^ (rayDirection ^* t)
+                           , intersectionNormal = planeNormal
+                           , intersectionTMin = t }
+
+intersectRayShape ray (Triangle tA tB tC) = do
+  let planeNormal = unP (tB - tA) `cross` unP (tC - tA)
+  case intersectRayShape ray (Plane tA planeNormal) of
+    Nothing -> Nothing
+    Just i@Intersection{intersectionPoint} -> do
+      let edge0 = unP $ tB - tA; edge1 = unP $ tC - tB; edge2 = unP $ tA - tC
+      if    planeNormal `dot` (edge0 `cross` unP (intersectionPoint - tA)) >= 0
+         && planeNormal `dot` (edge1 `cross` unP (intersectionPoint - tB)) >= 0
+         && planeNormal `dot` (edge2 `cross` unP (intersectionPoint - tC)) >= 0
+      then Just i
+      else Nothing
 
 -- | Find the nearest intersection between a ray and any object
 closestIntersection
@@ -282,6 +293,12 @@ demoScene =
                      { color = CN.yellow
                      , specular = 1000
                      , reflective = 0.5 } }
+      , Object
+        { shape = Triangle (P$V3 (-1) 0.5 4) (P$V3 1 0.5 4) (P$V3 0 1.25 2.5)
+        , material = Material
+                     { color = CN.silver
+                     , specular = 0
+                     , reflective = 1.0 } }
       ]
   , lights =
       [ AmbientLight 0.05

@@ -21,7 +21,8 @@ data Scene
   = Scene
     { objects  :: [Object]
     , lights  :: [Light]
-    , camera  :: Camera }
+    , camera  :: Camera
+    , background :: Colour Double }
     deriving Show
 
 data Light
@@ -202,7 +203,7 @@ traceRay
   -> Colour Double
 traceRay scene ray@(Ray _ d) tMin tMax rl =
   case closestIntersection scene ray tMin tMax of
-    Nothing -> backgroundColor
+    Nothing -> background scene
     Just (closestI, closestShape) ->
       let
         intersection = intersectionPoint closestI
@@ -228,9 +229,6 @@ viewportSize = 1
 -- | Distance between the camera and the projection plane
 projectionPlaneZ :: Double
 projectionPlaneZ = 1
-
-backgroundColor :: Colour Double
-backgroundColor = CN.black
 
 canvasWidth :: Int
 canvasWidth = 800
@@ -308,7 +306,8 @@ demoScene =
       Camera
       { cameraPosition = P $ V3 0 0 0
       , cameraDirection = V3 0 0 (-1)
-      , cameraUp = V3 0 1 0 } }
+      , cameraUp = V3 0 1 0 }
+  , background = CN.black }
 
 main :: IO ()
 main = do

@@ -1,12 +1,13 @@
 module Main where
 
-import Data.Colour
-import Data.Colour.SRGB
+import           Data.Colour
 import qualified Data.Colour.Names as CN
-import Linear
-import Data.List (sortBy, sortOn)
-import Codec.Picture
+import           Data.Colour.SRGB
+import           Codec.Picture
+import           Data.List (sortOn)
+import           Linear
 
+infinity :: Double
 infinity = 1/0
 
 newtype Scene = Scene
@@ -29,8 +30,8 @@ intersectRaySphere o d sphere =
       c = dot co co - (r * r)
 
       discriminant =
-        let d = b*b - 4*a*c in
-          if d < 0 then infinity else d
+        let d' = b*b - 4*a*c in
+          if d' < 0 then infinity else d'
 
       t1 = ((-1 * b) + sqrt discriminant) / (2*a)
       t2 = ((-1 * b) - sqrt discriminant) / (2*a)
@@ -48,8 +49,10 @@ traceRay scene o d tMin tMax =
   in
     maybe backgroundColor sColor closestSphere
 
+viewportSize :: Double
 viewportSize = 1
 
+projectionPlaneZ :: Double
 projectionPlaneZ = 1
 
 cameraPosition :: V3 Double

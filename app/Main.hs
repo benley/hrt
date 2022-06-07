@@ -1,12 +1,12 @@
 module Main where
 
-import Codec.Picture
-import Linear
-import Linear.Affine
+import           Codec.Picture
 import qualified Data.Colour.Names as CN
+import           Linear
+import           Linear.Affine
 
-import Hrt
-import Hrt.Scene
+import           Hrt
+import           Hrt.Scene
 
 demoScene :: Scene
 demoScene =

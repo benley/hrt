@@ -1,15 +1,14 @@
 {-# LANGUAGE NamedFieldPuns #-}
 module Main where
 
-import Data.Colour
-import Data.Colour.SRGB
+import           Codec.Picture
+import           Data.Colour
 import qualified Data.Colour.Names as CN
-import Linear
-import Data.List (sortBy, sortOn)
-import Codec.Picture
-import Data.Maybe (fromJust)
-import qualified Data.Colour as CN
+import           Data.Colour.SRGB
+import           Data.List (sortOn)
+import           Linear
 
+infinity :: Double
 infinity = 1/0
 
 data Scene
@@ -54,7 +53,7 @@ computeLighting scene p n cV s
       case closestIntersection scene p l 0.001 1 of
         Nothing ->                           -- No shadow
           if dot n l <= 0 then 0 else
-            intensity * (dot n l) / (norm n * norm l) + doSpecular intensity l
+            intensity * dot n l / (norm n * norm l) + doSpecular intensity l
         Just _ -> 0                          -- Light ray is occluded
 
     computeLight (Directional {intensity, direction}) = do
@@ -62,12 +61,12 @@ computeLighting scene p n cV s
       case closestIntersection scene p l 0.001 infinity of
         Nothing ->
           if dot n l <= 0 then 0 else
-            intensity * (dot n l) / (norm n * norm l) + doSpecular intensity l
+            intensity * dot n l / (norm n * norm l) + doSpecular intensity l
         Just _ -> 0
 
     doSpecular intensity l
       | s >= 0 =
-          let r = 2 *^ n ^* (dot n l) - l in
+          let r = 2 *^ n ^* dot n l - l in
             if dot r cV > 0 then
               intensity * ((dot r cV / (norm r * norm cV)) ** s)
             else 0
@@ -87,8 +86,8 @@ intersectRaySphere o d sphere =
       c = dot co co - (r * r)
 
       discriminant =
-        let d = b*b - 4*a*c in
-          if d < 0 then infinity else d
+        let d' = b*b - 4*a*c in
+          if d' < 0 then infinity else d'
 
       t1 = ((-1 * b) + sqrt discriminant) / (2*a)
       t2 = ((-1 * b) - sqrt discriminant) / (2*a)
@@ -131,8 +130,10 @@ traceRay scene o d tMin tMax =
         intensity = computeLighting scene intersection normal (-d) (sSpecular closestSphere)
       in darken intensity (sColor closestSphere)
 
+viewportSize :: Double
 viewportSize = 1
 
+projectionPlaneZ :: Double
 projectionPlaneZ = 1
 
 cameraPosition :: V3 Double

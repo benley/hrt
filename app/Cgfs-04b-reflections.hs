@@ -1,12 +1,12 @@
 {-# LANGUAGE NamedFieldPuns #-}
 module Main where
 
-import Data.Colour
-import Data.Colour.SRGB
+import           Codec.Picture
+import           Data.Colour
 import qualified Data.Colour.Names as CN
-import Linear
-import Data.List (sortOn)
-import Codec.Picture
+import           Data.Colour.SRGB
+import           Data.List (sortOn)
+import           Linear
 
 infinity :: Double
 infinity = 1/0

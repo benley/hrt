@@ -1,5 +1,6 @@
 {-# LANGUAGE NamedFieldPuns #-}
-module Main where
+
+module Hrt where
 
 import Codec.Picture
 import Control.Lens
@@ -9,72 +10,14 @@ import Data.List (sortOn)
 import Data.Maybe (mapMaybe)
 import Linear
 import Linear.Affine
-import qualified Data.Colour.Names as CN
+
+import Hrt.Scene
 
 infinity :: Double
 infinity = 1/0
 
 epsilon :: Double
 epsilon = 1e-07
-
-data Scene
-  = Scene
-    { objects  :: [Object]
-    , lights  :: [Light]
-    , camera  :: Camera
-    , background :: Colour Double }
-    deriving Show
-
-data Light
-  = AmbientLight
-    { intensity :: Double }
-  | PointLight
-    { intensity :: Double
-    , position  :: Point V3 Double }
-  | DirectionalLight
-    { intensity :: Double
-    , direction :: V3 Double }
-  deriving Show
-
-data Shape
-  = Sphere
-    { sCenter     :: Point V3 Double
-    , sRadius     :: Double }
-  | Plane
-    { planePoint  :: Point V3 Double
-    , planeNormal :: V3 Double }
-  | Triangle (Point V3 Double) (Point V3 Double) (Point V3 Double)
-  deriving Show
-
-data Material
-  = ColorMaterial
-    { color :: Colour Double }
-  | Material
-    { color :: Colour Double
-    , reflective :: Double
-    , specular :: Double }
-  deriving Show
-
-data Object = Object { shape :: Shape, material :: Material } deriving Show
-
-data Camera
-  = Camera
-    { cameraPosition  :: Point V3 Double
-    , cameraDirection :: V3 Double
-    , cameraUp        :: V3 Double
-    } deriving Show
-
-data Ray
-  = Ray
-    { rayOrigin :: Point V3 Double
-    , rayDirection :: V3 Double
-    } deriving Show
-
-data Intersection
-  = Intersection
-    { intersectionPoint  :: Point V3 Double
-    , intersectionNormal :: V3 Double
-    , intersectionTMin   :: Double }
 
 -- | Compute light intensity at a point & normal
 computeLighting
@@ -254,62 +197,3 @@ pixelRenderer scene@Scene{camera} x y =
     direction = cameraRotation !* canvasToViewport (V2 x y)
     RGB r g b = toSRGB24 $ traceRay scene (Ray (cameraPosition camera) direction) epsilon infinity recursionDepth
   in PixelRGB8 r g b
-
-demoScene :: Scene
-demoScene =
-  Scene
-  { objects =
-      [ Object
-        { shape = Sphere
-                  { sCenter = P $ V3 0 (-1) 3
-                  , sRadius = 1 }
-        , material = Material
-                     { color = CN.red
-                     , specular = 500
-                     , reflective = 0.2 } }
-      , Object
-        { shape = Sphere
-                  { sCenter = P $ V3 (-2) 0 4
-                  , sRadius = 1 }
-        , material = Material
-                     { color = CN.green
-                     , specular = 10
-                     , reflective = 0.2 } }
-      , Object
-        { shape = Sphere
-                  { sCenter = P $ V3 2 0 4
-                  , sRadius = 1 }
-        , material = Material
-                     { color = CN.blue
-                     , specular = 500
-                     , reflective = 0.1 } }
-      , Object
-        { shape = Plane
-                  { planePoint = P $ V3 0 (-1) 0
-                  , planeNormal = V3 0 1 0 }
-        , material = Material
-                     { color = CN.yellow
-                     , specular = 1000
-                     , reflective = 0.5 } }
-      , Object
-        { shape = Triangle (P$V3 (-1) 0.5 4) (P$V3 1 0.5 4) (P$V3 0 1.25 2.5)
-        , material = Material
-                     { color = CN.silver
-                     , specular = 0
-                     , reflective = 1.0 } }
-      ]
-  , lights =
-      [ AmbientLight 0.05
-      , PointLight 0.6 (P $ V3 2 1 0)
-      , DirectionalLight 0.2 (V3 1 4 4) ]
-  , camera =
-      Camera
-      { cameraPosition = P $ V3 0 0 0
-      , cameraDirection = V3 0 0 (-1)
-      , cameraUp = V3 0 1 0 }
-  , background = CN.black }
-
-main :: IO ()
-main = do
-  writePng "output.png" $ generateImage (pixelRenderer demoScene) canvasWidth canvasHeight
-  putStrLn "wrote to output.png"

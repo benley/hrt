@@ -30,6 +30,13 @@ common deps
       , JuicyPixels ^>=3.3.7
       , lens ^>=5.0.1
 
+library
+    import: deps
+    hs-source-dirs:   src
+    exposed-modules:
+        Hrt
+        Hrt.Scene
+
 executable cgfs-02-basic-raytracing
     import: deps
     main-is:          Cgfs-02-basic-raytracing.hs
@@ -55,7 +62,9 @@ executable cgfs-04b-reflections
     main-is:          Cgfs-04b-reflections.hs
     hs-source-dirs:   app
 
-executable cgfs-05
+executable hrt
     import: deps
-    main-is:          Cgfs-05.hs
+    main-is:          Main.hs
     hs-source-dirs:   app
+    build-depends:
+        hrt

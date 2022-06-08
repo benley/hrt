@@ -5,7 +5,7 @@
 
 module Hrt.Scene where
 
-import Data.Aeson (FromJSON, parseJSON, (.:), withObject, eitherDecodeFileStrict)
+import Data.Yaml (FromJSON, parseJSON, (.:), withObject, decodeFileEither, ParseException)
 import Data.Colour
 import GHC.Generics
 import Linear
@@ -89,5 +89,5 @@ data Camera
     , cameraUp        :: V3 Double
     } deriving (Generic, Show)
 
-loadScene :: FilePath -> IO (Either String Scene)
-loadScene = eitherDecodeFileStrict
+loadScene :: FilePath -> IO (Either ParseException Scene)
+loadScene = decodeFileEither

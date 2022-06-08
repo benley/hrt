@@ -1,6 +1,7 @@
 module Main where
 
 import Codec.Picture
+import Data.Yaml (prettyPrintParseException)
 import System.Environment (getArgs)
 import System.Exit
 import System.IO (hPutStrLn, stderr)
@@ -17,7 +18,7 @@ main = do
       scene <- loadScene fp
       case scene of
         Left s -> do
-          die s
+          die (prettyPrintParseException s)
         Right s -> do
           hPutStrLn stderr "Rendering to output.png"
           writePng "output.png" $ generateImage (pixelRenderer s) canvasWidth canvasHeight

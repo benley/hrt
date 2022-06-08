@@ -9,6 +9,7 @@ let
     colour
     JuicyPixels
     lens
+    yaml
   ]);
 in
 pkgs.stdenv.mkDerivation {

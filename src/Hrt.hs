@@ -150,9 +150,6 @@ traceRay scene ray@(Ray _ d) tMin tMax rl =
     Just (closestI, closestShape) ->
       let
         intersection = intersectionPoint closestI
-        -- intersection = P $ o + (intersectionTMin closestI *^ d)
-        -- TODO this next line probably needs to go into the sphere intersection function
-        -- normal = n ^/ norm n where P n = intersection - sCenter closestSphere
         normal = intersectionNormal closestI
         intensity = computeLighting scene intersection normal (-d) (specular (material closestShape))
         localColor = darken intensity (color (material closestShape))
@@ -197,3 +194,15 @@ pixelRenderer scene@Scene{camera} x y =
     direction = cameraRotation !* canvasToViewport (V2 x y)
     RGB r g b = toSRGB24 $ traceRay scene (Ray (cameraPosition camera) direction) epsilon infinity recursionDepth
   in PixelRGB8 r g b
+
+data Ray
+  = Ray
+    { rayOrigin    :: Point V3 Double
+    , rayDirection :: V3 Double
+    } deriving Show
+
+data Intersection
+  = Intersection
+    { intersectionPoint  :: Point V3 Double
+    , intersectionNormal :: V3 Double
+    , intersectionTMin   :: Double }

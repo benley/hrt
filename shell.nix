@@ -4,9 +4,11 @@ let
   haskellPackages = pkgs.haskell.packages.${compiler};
 
   ghc = pkgs.haskell.packages.${compiler}.ghcWithPackages (ps: with ps; [
+    aeson
     linear
     colour
     JuicyPixels
+    lens
   ]);
 in
 pkgs.stdenv.mkDerivation {

@@ -1,12 +1,12 @@
 module Main where
 
-import Codec.Picture
 import Data.Yaml (prettyPrintParseException)
 import System.Environment (getArgs)
 import System.Exit
 import System.IO (hPutStrLn, stderr)
 
 import Hrt
+import Hrt.IO
 import Hrt.Scene
 
 main :: IO ()
@@ -21,6 +21,6 @@ main = do
           die (prettyPrintParseException s)
         Right s -> do
           hPutStrLn stderr "Rendering to output.png"
-          writePng "output.png" $ generateImage (pixelRenderer s) canvasWidth canvasHeight
+          renderToPng s "output.png" canvasWidth canvasHeight
           hPutStrLn stderr "Done"
     _ -> die "USAGE: hrt <scenefile.json>"

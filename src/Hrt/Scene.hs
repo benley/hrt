@@ -1,16 +1,22 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
--- |
+-- I don't like doing this but I haven't come up with a better plan either
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 module Hrt.Scene where
 
-import Data.Yaml (FromJSON, parseJSON, (.:), withObject, decodeFileEither, ParseException)
+import Data.Aeson (FromJSON, parseJSON, genericParseJSON, defaultOptions, fieldLabelModifier)
 import Data.Colour
+import Data.Colour.SRGB (sRGB24read)
+import Data.Char (toLower)
 import GHC.Generics
 import Linear
 import Linear.Affine
-import Data.Colour.SRGB (sRGB24read)
+
+lower1 :: String -> String
+lower1 (c:cs) = toLower c : cs
+lower1 [] = []
 
 instance (FromJSON a) => FromJSON (Point V3 a) where
     parseJSON = fmap (\(x, y, z) -> P $ V3 x y z) . parseJSON
@@ -22,10 +28,7 @@ instance (FromJSON a, Ord a, Floating a) => FromJSON (Colour a) where
   parseJSON = fmap sRGB24read . parseJSON
 
 instance FromJSON Camera where
-  parseJSON = withObject "camera" $ \v ->
-    Camera <$> v.: "position"
-           <*> v.: "direction"
-           <*> v.: "up"
+  parseJSON = genericParseJSON defaultOptions { fieldLabelModifier = lower1 . drop 6 }
 
 instance FromJSON Scene
 
@@ -88,6 +91,3 @@ data Camera
     , cameraDirection :: V3 Double
     , cameraUp        :: V3 Double
     } deriving (Generic, Show)
-
-loadScene :: FilePath -> IO (Either ParseException Scene)
-loadScene = decodeFileEither

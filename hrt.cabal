@@ -37,6 +37,7 @@ library
     hs-source-dirs:   src
     exposed-modules:
         Hrt
+        Hrt.IO
         Hrt.Scene
 
 executable cgfs-02-basic-raytracing

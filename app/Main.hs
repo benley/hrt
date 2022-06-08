@@ -3,6 +3,7 @@ module Main where
 import Codec.Picture
 import System.Environment (getArgs)
 import System.Exit
+import System.IO (hPutStrLn, stderr)
 
 import Hrt
 import Hrt.Scene
@@ -12,14 +13,13 @@ main = do
   args <- getArgs
   case args of
     [fp] -> do
-      putStrLn $ "Loading scene from " ++ fp
+      hPutStrLn stderr $ "Loading scene from " ++ fp
       scene <- loadScene fp
       case scene of
         Left s -> do
-          putStrLn s
-          exitFailure
+          die s
         Right s -> do
-          putStrLn "Rendering to output.png"
+          hPutStrLn stderr "Rendering to output.png"
           writePng "output.png" $ generateImage (pixelRenderer s) canvasWidth canvasHeight
-          putStrLn "Done"
+          hPutStrLn stderr "Done"
     _ -> die "USAGE: hrt <scenefile.json>"

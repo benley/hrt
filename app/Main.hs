@@ -7,7 +7,6 @@ import System.IO (hPutStrLn, stderr)
 
 import Hrt
 import Hrt.IO
-import Hrt.Scene
 
 main :: IO ()
 main = do

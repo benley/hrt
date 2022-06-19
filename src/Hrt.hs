@@ -1,4 +1,5 @@
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 module Hrt where
 
@@ -28,35 +29,34 @@ computeLighting
   -> Double          -- ^ specular exponent
   -> Double
 computeLighting scene p n cV s
-  = sum $ map computeLight $ lights scene
+  = sum $ map computeLight scene.lights
   where
     computeLight (AmbientLight i) = i
 
-    computeLight (PointLight {intensity, position}) = do
-      let l = unP $ position - p
+    computeLight light@PointLight{} = do
+      let l = unP $ light.position - p
+          nDotL = n `dot` l
       case closestIntersection scene (Ray p l) epsilon 1 of
-        -- No shadow
-        Nothing ->
-          if dot n l <= 0 then 0 else
-            intensity * dot n l / (norm n * norm l) + doSpecular intensity l
-        -- Light ray is occluded
-        Just _ -> 0
+        Nothing | nDotL > 0 ->
+          -- No shadow, and the light hits the front surface
+          light.intensity * nDotL / (norm n * norm l) + doSpecular light.intensity l
+        _ -> 0
 
-    computeLight (DirectionalLight {intensity, direction}) = do
-      let l = direction
-      case closestIntersection scene (Ray p l) epsilon infinity of
-        Nothing ->
-          if dot n l <= 0 then 0 else
-            intensity * dot n l / (norm n * norm l) + doSpecular intensity l
-        Just _ -> 0
+    computeLight light@DirectionalLight{} = do
+      let nDotL = n `dot` light.direction
+      case closestIntersection scene (Ray p light.direction) epsilon infinity of
+        Nothing | nDotL > 0 ->
+            light.intensity * nDotL / (norm n * norm light.direction) + doSpecular light.intensity light.direction
+        _ -> 0
 
     doSpecular :: Double -> V3 Double -> Double
-    doSpecular intensity l | s >= 0 =
-                             let r = reflectRay l n in
-                               if dot r cV > 0 then
-                                 intensity * ((dot r cV / (norm r * norm cV)) ** s)
-                               else 0
-                           | otherwise = 0
+    doSpecular _ _ | s < 0 = 0
+    doSpecular intensity l = do
+      let r = reflectRay l n
+          rDotCV = r `dot` cV
+      if rDotCV > 0 then
+        intensity * ((rDotCV / (norm r * norm cV)) ** s)
+      else 0
 
 reflectRay
   :: V3 Double  -- ^ direction
